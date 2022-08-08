@@ -328,6 +328,7 @@ train_method = 'MLP_minus_notMirror_early'
 num_epochs = 5000
 batch_size = 100
 k_iteration = 1
+start_epochs = 0
 # ----------------------------------set parameters---------------------------------------
 set_para()
 train_file_name = './test_{0}/standlization_data/{0}_std_train_{1}.csv'.format(dataset_name, dataset_index)
@@ -403,16 +404,32 @@ dependency_dict = {
 }
 
 
-# 默认初始化模型
+
+dependency_list = ['20000', '15000', '10000', '8000', '5000', '2000']
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net = Classification(input_dim)
-init.normal_(net.hidden_1.weight, mean=0, std=0.01)
-init.normal_(net.output.weight, mean=0, std=0.01)
-init.constant_(net.hidden_1.bias, val=0)
-init.constant_(net.output.bias, val=0)
 
+for train_epoch in dependency_list:
+    
+    history_train_method = 'MLP_{0}_{1}_{2}'.format(infor_method, k_iteration, train_epoch)
+    history_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, history_train_method, record_index, dataset_index)
+    # 判断追训模型是否存在
+    print(history_model_name)
+    if os.path.exists(history_model_name):
+        # 找到模型，追训
+        net = torch.load(history_model_name, map_location=device)
+        start_epochs = int(train_epoch)
+        break
 
+if start_epochs == 0:
+    net = Classification(input_dim)
+    init.normal_(net.hidden_1.weight, mean=0, std=0.01)
+    init.normal_(net.output.weight, mean=0, std=0.01)
+    init.constant_(net.hidden_1.bias, val=0)
+    init.constant_(net.output.bias, val=0)
+    
 net.to(device)
+
 
 loss_fn = nn.BCELoss()
 # loss_fn_1 = nn.BCELoss(reduction='none')
@@ -438,7 +455,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 # input_valid_label_gpu = input_valid_label.to(device)
 
 
-for epoch in range(num_epochs):
+for epoch in range(start_epochs+1, num_epochs+1):
     batch_x_pos, batch_x_neg, batch_pos_sel, batch_neg_sel = generate_batch_data(positive_data, negative_data, infor_method, informative_minority_data, border_majority_data, batch_size)
     train_x, train_y = transform_data_to_train_form(infor_method, batch_x_pos, batch_x_neg, batch_pos_sel, batch_neg_sel)
 

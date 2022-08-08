@@ -29,71 +29,108 @@ ref_times_list = ['10']
 boundary_type_list = ['half']
 
 
-# for file_index in dataset_dict:
-    # dataset_list = dataset_dict[file_index]
 device_id = 0
-# with open('train_mlp_katana.sh', 'w') as fsh:
+train_method = ''
+test_method = ''
+train_command_list = []
+test_command_list = []
+train_num = 0
+test_num = 0
 command_list = []
 for dataset in dataset_list:
     for sample_method in train_infor_method_list:
         for k_iteration in k_list:
+            cur_command_list = []
+            cur_valid_command_list = []
+            cur_train_num = 0
+            cur_test_num = 0
+
+            cur_train_dir_list = []
             for early_stop_type in early_stop_type_list:
-                for test_infor_method in test_infor_method_list:
-                    for test_k in test_k_list:
-                        for ref_num_type in ref_num_type_list:
-                            for ref_times in ref_times_list:
-                                for boundary_type in boundary_type_list:
-                                    cur_command_list = []
-                                    path_flag = False
+                train_method = 'MLP_{0}_{1}_{2}'.format(sample_method, k_iteration, early_stop_type)
+                train_dir_com_str = 'mkdir -p ./test_{0}/model_{2}/record_{1}/\n'.format(dataset, record_index, train_method)
+                cur_train_dir_list.append(train_dir_com_str)
+            cur_train_dir_list.append('\n\n\n')
+
+            # 根据训练模型，创建训练任务
+            cur_train_com_list = []
+            for dataset_index in range(1, 6):
+                cur_path = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset, train_method, record_index, dataset_index)
+                if not os.path.exists(cur_path):
+                    trian_com_str = 'python3 ./classifier_MLP/train_MLP.py dataset_name={0} dataset_index={1} record_index=1 device_id={2} train_method={3}\n'.format(dataset, dataset_index, device_id, train_method)
+                    cur_train_com_list.append(trian_com_str)
+                    # cur_valid_command_list.append(trian_com_str)
+                    cur_train_num += 1
+            if len(cur_train_com_list) > 0:
+                cur_train_com_list.append('\n\n\n')
+
+            cur_test_com_list = []
+
+            for test_infor_method in test_infor_method_list:
+                for test_k in test_k_list:
+                    for ref_num_type in ref_num_type_list:
+                        for ref_times in ref_times_list:
+                            for boundary_type in boundary_type_list:
+                                test_method = '{0}_{1}_{2}_{3}_{4}'.format(test_infor_method, test_k, ref_num_type, ref_times, boundary_type)
+                                for early_stop_type in early_stop_type_list:
+                                    cur_test_com_sub_list = []
                                     train_method = 'MLP_{0}_{1}_{2}'.format(sample_method, k_iteration, early_stop_type)
-                                    test_method = '{0}_{1}_{2}_{3}_{4}'.format(test_infor_method, test_k, ref_num_type, ref_times, boundary_type)
-                                    # cur_command_list.append('mkdir -p ./test_{0}/model_{2}/record_{1}/\n'.format(dataset, record_index, train_method)) 
-                                    # cur_command_list.append('mkdir -p ./test_{0}/result_{1}_{2}/record_{3}/\n'.format(dataset, train_method, test_method, record_index))
+                                    mkdir_command = 'mkdir -p ./test_{0}/result_{1}_{2}/record_{3}/\n'.format(dataset, train_method, test_method, record_index)
+                                    test_path_flag = False
+
                                     
-
                                     for dataset_index in range(1, 6):
-                                        # cur_path = './test_{0}/result_{1}_{2}/record_{3}/{0}_{4}_pred_result.txt'.format(dataset, train_method, test_method, record_index, dataset_index)
-                                        cur_path = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset, train_method, record_index, dataset_index)
-                                        if os.path.exists(cur_path):
-                                            pass
-                                        else:
-                                            if not path_flag:
-                                                cur_command_list.append('mkdir -p ./test_{0}/model_{2}/record_{1}/\n'.format(dataset, record_index, train_method)) 
-                                                cur_command_list.append('mkdir -p ./test_{0}/result_{1}_{2}/record_{3}/\n'.format(dataset, train_method, test_method, record_index))
-                                                path_flag = True
-                                            
-                                            cur_command_list.append('python3 ./classifier_MLP/train_MLP.py dataset_name={0} dataset_index={1} record_index=1 device_id={2} train_method={3}\n'.format(dataset, dataset_index, device_id, train_method))
-                                            cur_command_list.append('python3 ./classifier_MLP/test.py dataset_name={0} dataset_index={1} record_index=1 train_method={2} test_method={3} device_id={4}\n'.format(dataset, dataset_index, train_method, test_method, device_id))
-                                    if path_flag:
-                                        cur_command_list.append('\n\n\n')
-                                    if len(cur_command_list) != 0:
-                                        command_list.append(cur_command_list)
+                                        cur_path = './test_{0}/result_{1}_{2}/record_{3}/{0}_{4}_pred_result.txt'.format(dataset, train_method, test_method, record_index, dataset_index)
+                                        if not os.path.exists(cur_path):
+                                            if not test_path_flag:
+                                                test_path_flag = True
+                                                cur_test_com_sub_list.append(mkdir_command)
+                                            test_com_str = 'python3 ./classifier_MLP/test.py dataset_name={0} dataset_index={1} record_index=1 train_method={2} test_method={3} device_id={4}\n'.format(dataset, dataset_index, train_method, test_method, device_id)
+                                            cur_test_com_sub_list.append(test_com_str)
+                                            # cur_valid_command_list.append(test_com_str)
+                                            cur_test_num += 1
+                                    if test_path_flag:
+                                        cur_test_com_sub_list.append('\n\n\n')
+                                    if len(cur_test_com_sub_list) > 0:
+                                        cur_test_com_list.append(cur_test_com_sub_list)
 
+            if len(cur_train_com_list) > 0:
+                train_command_list.append(cur_train_dir_list)
+                train_command_list.append(cur_train_com_list)
+                # cur_dataset_com_list += cur_test_com_list
+                # command_list.append(cur_dataset_com_list)
+            if len(cur_test_com_list) > 0:
+                test_command_list += cur_test_com_list
+            train_num += len(cur_train_com_list)
+            test_num += len(cur_test_com_list)
 
-
-
-                                        # for dataset_index in range(1, 6):
-                                        #     cur_command_list.append('python3 ./classifier_MLP/train_MLP.py dataset_name={0} dataset_index={1} record_index=1 device_id={2} train_method={3}\n'.format(dataset, dataset_index, device_id, train_method))
-                                        #     cur_command_list.append('python3 ./classifier_MLP/test.py dataset_name={0} dataset_index={1} record_index=1 train_method={2} test_method={3} device_id={4}\n'.format(dataset, dataset_index, train_method, test_method, device_id))
-                                        
-                                        # cur_command_list.append('\n\n\n')
-                                        # command_list.append(cur_command_list)
+print('train_num is {0}'.format(train_num))
+print('train com num is {0}'.format(len(train_command_list)))
+print('test_num is {0}'.format(test_num))
+print('test com num is {0}'.format(len(test_command_list)))
                 
 
 total_file_num = 10
-total_length = len(command_list)
-start = 0
-offset = math.ceil(float(total_length)/total_file_num)
+# total_length = len(command_list)
+train_start = 0
+test_start = 0
+train_offset = math.ceil(float(len(train_command_list))/total_file_num)
+test_offset = math.ceil(float(len(test_command_list))/total_file_num)
 # print(total_length)
 # print(offset)
 for file_index in range(1, total_file_num+1):
     # print(file_index)
     # print(start, offset)
     if file_index < total_file_num:
-        cur_command_list = command_list[start:start + offset]
-        start += offset
+        
+        cur_train_command_list = train_command_list[train_start:train_start+train_offset]
+        cur_test_command_list = test_command_list[test_start:test_start+test_offset]
+        train_start += train_offset
+        test_start += test_offset
     else:
-        cur_command_list = command_list[start:]
+        cur_train_command_list = train_command_list[train_start:]
+        cur_test_command_list = test_command_list[test_start:]
+    cur_command_list = cur_train_command_list + cur_test_command_list
     print(len(cur_command_list))
     with open('job_{0}.qjob'.format(file_index), 'w') as fsh:
         fsh.write('# 选择资源\n\n\n')
@@ -112,7 +149,11 @@ for file_index in range(1, total_file_num+1):
         fsh.write('which python\n\n\n\n')
         for item_command_list in cur_command_list:
             for line in item_command_list:
-                fsh.write(line)
+                if isinstance(line, str):
+                    fsh.write(line)
+                if isinstance(line, list):
+                    for sub_line in line:
+                        fsh.write(sub_line)
 
 
 # -------------------- 检查 train ----------------------------------
