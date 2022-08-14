@@ -329,6 +329,7 @@ num_epochs = 5000
 batch_size = 100
 k_iteration = 1
 start_epochs = 0
+save_epoch = 2000
 # ----------------------------------set parameters---------------------------------------
 set_para()
 train_file_name = './test_{0}/standlization_data/{0}_std_train_{1}.csv'.format(dataset_name, dataset_index)
@@ -395,17 +396,19 @@ class Classification(nn.Module):
         return x
 
 dependency_dict = {
-    20000: 15000,
-    15000: 10000,
-    10000: 8000,
-    8000: 5000,
-    5000: 2000,
-    2000: None
+    20000: None,
+    15000: 20000,
+    10000: 15000,
+    8000: 10000,
+    5000: 8000,
+    2000: 5000,
+    0: 2000
 }
 
 
 
-dependency_list = ['20000', '15000', '10000', '8000', '5000', '2000']
+# dependency_list = ['20000', '15000', '10000', '8000', '5000', '2000']
+dependency_list = ['2000', '5000', '8000', '10000', '15000', '20000']
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -419,7 +422,15 @@ for train_epoch in dependency_list:
         # 找到模型，追训
         net = torch.load(history_model_name, map_location=device)
         start_epochs = int(train_epoch)
+    else:
+        # 没有找到，开始训练
+        save_epoch = int(train_epoch)
         break
+
+if start_epochs == num_epochs:
+    # 如果已经是最后一个，就直接退出
+    print('running_time is 0')
+    exit(0)
 
 if start_epochs == 0:
     net = Classification(input_dim)
@@ -427,7 +438,10 @@ if start_epochs == 0:
     init.normal_(net.output.weight, mean=0, std=0.01)
     init.constant_(net.hidden_1.bias, val=0)
     init.constant_(net.output.bias, val=0)
-    
+
+# 根据启动循环，确定推出位置
+save_epoch = dependency_dict[start_epochs]
+
 net.to(device)
 
 
@@ -454,8 +468,13 @@ optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 # input_valid_data = input_valid_data.to(device)
 # input_valid_label_gpu = input_valid_label.to(device)
 
+cur_train_epochs = start_epochs
+for epoch in range(num_epochs):
+    if cur_train_epochs >= num_epochs:
+        # 判断开始时是否已经是最新的位置
+        break
+    cur_train_epochs += 1
 
-for epoch in range(start_epochs+1, num_epochs+1):
     batch_x_pos, batch_x_neg, batch_pos_sel, batch_neg_sel = generate_batch_data(positive_data, negative_data, infor_method, informative_minority_data, border_majority_data, batch_size)
     train_x, train_y = transform_data_to_train_form(infor_method, batch_x_pos, batch_x_neg, batch_pos_sel, batch_neg_sel)
 
@@ -496,7 +515,42 @@ for epoch in range(start_epochs+1, num_epochs+1):
         # auc = skmet.roc_auc_score(y_true=input_valid_label, y_score=result)
         # print('epoch {:.0f}, loss {:.4f}, train acc {:.2f}%, f1 {:.4f}, precision {:.4f}, recall {:.4f}, auc {:.4f}'.format(epoch+1, train_loss, train_acc*100, f1, pre, rec, auc) )
         print('epoch {:.0f}, loss {:.4f}'.format(epoch+1, train_loss) )
+    if cur_train_epochs == save_epoch:
+        cur_train_method = 'MLP_{0}_{1}_{2}'.format(infor_method, k_iteration, str(save_epoch))
+        cur_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, cur_train_method, record_index, dataset_index)
+        torch.save(net, cur_model_name)
+        save_epoch = dependency_dict[cur_train_epochs]
+        print('save model {0}'.format(cur_model_name))
+
+        last_train_epoch = 0
+        for train_epoch in dependency_list:
+            history_train_method = 'MLP_{0}_{1}_{2}'.format(infor_method, k_iteration, str(train_epoch))
+            history_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, history_train_method, record_index, dataset_index)
+            # 判断追训模型是否存在
+            print(history_model_name)
+            if os.path.exists(history_model_name):
+                # 更新已有模型标记
+                last_train_epoch = train_epoch
+            else:
+                save_epoch = int(train_epoch)
+                if last_train_epoch != cur_train_epochs:
+                    history_train_method = 'MLP_{0}_{1}_{2}'.format(infor_method, k_iteration, str(last_train_epoch))
+                    history_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, history_train_method, record_index, dataset_index)
+                    net = torch.load(history_model_name, map_location=device)
+                    cur_train_epochs = int(last_train_epoch)
+                break
+    
+    if cur_train_epochs >= num_epochs:
+        break
+
         
+
+            
+cur_train_method_list = [model_type, infor_method, str(save_epoch)]
+cur_train_method = '_'.join(cur_train_method_list)
+cur_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, cur_train_method, record_index, dataset_index)
+torch.save(net, cur_model_name)
+print('save model {0}'.format(cur_model_name))   
 
 torch.save(net, model_name)
 
