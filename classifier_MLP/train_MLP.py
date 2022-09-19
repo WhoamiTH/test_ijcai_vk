@@ -543,18 +543,6 @@ for epoch in range(num_epochs):
     if cur_train_epochs >= num_epochs:
         break
 
-        
-
-            
-cur_train_method_list = [model_type, infor_method, k_iteration, str(save_epoch)]
-cur_train_method = '_'.join(cur_train_method_list)
-cur_model_name = './test_{0}/model_{1}/record_{2}/{1}_{3}'.format(dataset_name, cur_train_method, record_index, dataset_index)
-torch.save(net, cur_model_name)
-print('save model {0}'.format(cur_model_name))   
-
-torch.save(net, model_name)
-
-
 finish = time.process_time()
 running_time = finish-start
 print('running_time is {0}'.format(running_time))
